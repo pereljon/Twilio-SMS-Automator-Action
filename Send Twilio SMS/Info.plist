@@ -25,6 +25,8 @@
 	<dict/>
 	<key>AMDescription</key>
 	<dict>
+		<key>AMDOptions</key>
+		<string>Separate multiple recipients with commas.</string>
 		<key>AMDInput</key>
 		<string> If text is received from a previous action, the text is appended to the message.</string>
 		<key>AMDRequires</key>

@@ -6,23 +6,30 @@
 #  Created by Jonathan Perel on 12/14/16.
 #  Copyright © 2016 Metro Eighteen. All rights reserved.
 
-logger -t $(basename $0) "Starting"
+
+function logToFile {
+echo "$(date "+%b %d %H:%M:%S") : $1">>"${HOME}/Library/Logs/SendTwilioSMS.log"
+}
+
+logToFile "Starting"
 
 # Input error checking
 if [ -z "$accountSID" ]; then
-    logger -t $(basename $0) "ERROR: Missing account SID."
+    logToFile "ERROR: Missing account SID."
 elif [ -z "$authToken" ]; then
-    logger -t $(basename $0) "ERROR: Missing account token."
+    logToFile "ERROR: Missing account token."
 elif [ -z "$fromNumber" ]; then
-    logger -t $(basename $0) "ERROR: Missing FROM number."
+    logToFile "ERROR: Missing FROM number."
 elif [ -z "$toNumber" ]; then
-    logger -t $(basename $0) "ERROR: Missing TO number."
+    logToFile"ERROR: Missing TO number."
 elif [ -z "$stdin_message" ] && [ -z "$message" ]; then
-    logger -t $(basename $0) "ERROR: No message to send."
+    logToFile"ERROR: No message to send."
 else
+    if [[ -p /dev/stdin ]]; then
+        # Get stdin
+        stdin_message=$(</dev/stdin)
+    fi
 
-    # Get stdin
-    stdin_message=$(cat)
     if [ -n "$stdin_message" ]; then
     # Merge automator argument message with stdin message
         message_out="$message
@@ -32,18 +39,29 @@ else
         message_out="$message"
     fi
 
-    # POST message to Twilio API
-    result=$(/usr/bin/curl --connect-timeout 30 --max-time 60 -X POST "https://api.twilio.com/2010-04-01/Accounts/${accountSID}/Messages.json" --data-urlencode "To=${toNumber}" --data-urlencode "From=${fromNumber}" --data-urlencode "Body=${message_out}" -u ${accountSID}:${authToken})
-    success="\"error_code\": null"
-    if [[ ! $result =~ .*$success.* ]]; then
-        # Error in curl command
-        logger -t $(basename $0) "$result"
-        exit 1
-    fi
+    # Remove whitespace from toNumber
+    toNumberClean="$(echo ${toNumber//[[:blank:]]/})"
+
+    # Loop for multiple TO numbers separated by commas
+    IFS=","
+    for nextToNumber in $toNumberClean; do
+        # POST message to Twilio API
+        logToFile "Sending to: $nextToNumber"
+        result=$(/usr/bin/curl --connect-timeout 30 --max-time 60 --silent --show-error -X POST "https://api.twilio.com/2010-04-01/Accounts/${accountSID}/Messages.json" --data-urlencode "To=${nextToNumber}" --data-urlencode "From=${fromNumber}" --data-urlencode "Body=${message_out}" -u ${accountSID}:${authToken})
+        success="\"error_code\": null"
+        if [[ $result =~ .*$success.* ]]; then
+            #  Success
+            logToFile "Sent to: $nextToNumber"
+        else
+            # Error in curl command
+            logToFile "ERROR: $result"
+        fi
+    done
+    unset IFS
 
     # Echo stdin message to stdout for next automator action
     echo -n "${stdin_message}"
-    logger -t $(basename $0) "Exiting"
+    logToFile "Exiting"
     # Exiting with success
     exit 0
 fi
