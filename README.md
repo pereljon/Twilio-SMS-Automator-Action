@@ -3,7 +3,7 @@
 
 This is the first release of the *Twilio SMS Automator Action*. Let me know what you think. I'll be adding more functionality and error checking soon.
 
-Download from the [releases](https://github.com/pereljon/Twilio-SMS-Action/releases) page.
+Download from the [releases](https://github.com/pereljon/Twilio-SMS-Automator-Action/releases) page.
 
 Cheers,
 JP
