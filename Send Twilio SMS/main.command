@@ -6,9 +6,17 @@
 #  Created by Jonathan Perel on 12/14/16.
 #  Copyright © 2016 Metro Eighteen. All rights reserved.
 
+# CONSTANTS
+max_sms_size=1600
+log_directory="${HOME}/Library/Logs"
 
+# Log to file function
 function logToFile {
-echo "$(date "+%b %d %H:%M:%S") : $1">>"${HOME}/Library/Logs/SendTwilioSMS.log"
+if [ ! -d "$log_directory" ]; then
+    # Create doesn't exist.
+    mkdir -p "$log_directory"
+fi
+echo "$(date "+%b %d %H:%M:%S") : $1">>"${log_directory}/SendTwilioSMS.log"
 }
 
 logToFile "Starting"
@@ -21,9 +29,9 @@ elif [ -z "$authToken" ]; then
 elif [ -z "$fromNumber" ]; then
     logToFile "ERROR: Missing FROM number."
 elif [ -z "$toNumber" ]; then
-    logToFile"ERROR: Missing TO number."
+    logToFile "ERROR: Missing TO number."
 elif [ -z "$stdin_message" ] && [ -z "$message" ]; then
-    logToFile"ERROR: No message to send."
+    logToFile "ERROR: No message to send."
 else
     if [[ -p /dev/stdin ]]; then
         # Get stdin
@@ -37,6 +45,14 @@ else
     elif [ -n "$message" ]; then
     # Stdin message only
         message_out="$message"
+    fi
+
+    # Get message size
+    message_size=${#message_out}
+    if [ "$message_size" -gt "$max_sms_size" ]; then
+        # Clip long messages to $max_sms_size
+        logToFile "Clipping message from $message_size to $max_sms_size characters."
+        message_out="$(cut -c 1-$max_sms_size "$message_out")"
     fi
 
     # Remove whitespace from toNumber
