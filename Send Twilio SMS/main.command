@@ -52,7 +52,7 @@ else
     if [ "$message_size" -gt "$max_sms_size" ]; then
         # Clip long messages to $max_sms_size
         logToFile "Clipping message from $message_size to $max_sms_size characters."
-        message_out="$(cut -c 1-$max_sms_size "$message_out")"
+        message_out=${message_out:0:$max_sms_size}
     fi
 
     # Remove whitespace from toNumber
