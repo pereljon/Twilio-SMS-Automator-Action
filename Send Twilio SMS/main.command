@@ -21,6 +21,11 @@ echo "$(date "+%b %d %H:%M:%S") : $1">>"${log_directory}/SendTwilioSMS.log"
 
 logToFile "Starting"
 
+if [[ -p /dev/stdin ]]; then
+    # Get workflow message from stdin
+    stdin_message=$(</dev/stdin)
+fi
+
 # Input error checking
 if [ -z "$accountSID" ]; then
     logToFile "ERROR: Missing account SID."
@@ -33,17 +38,38 @@ elif [ -z "$toNumber" ]; then
 elif [ -z "$stdin_message" ] && [ -z "$message" ]; then
     logToFile "ERROR: No message to send."
 else
-    if [[ -p /dev/stdin ]]; then
-        # Get stdin
-        stdin_message=$(</dev/stdin)
-    fi
 
     if [ -n "$stdin_message" ]; then
-    # Merge automator argument message with stdin message
-        message_out="$message
-    $stdin_message"
-    elif [ -n "$message" ]; then
-    # Stdin message only
+    # Process workflow message (stdin)
+        if [ -n "$ignoreFilter" ]; then
+        # Skip sending if any line in ingoreFilter found in workflow message (stdin)
+            while read -r nextFilter; do
+                if [ -n "$nextFilter" ] && [[ "$stdin_message" == *"$nextFilter"* ]]; then
+                    # Skip sending this message
+                    logToFile "Ignore: $nextFilter"
+                    # Echo workflow (stdin) message to stdout for next automator action
+                    echo -n "${stdin_message}"
+                    exit 0
+                fi
+            done <<< "$ignoreFilter"
+        fi
+        # Make a copy of stdin_message to filter. Leave original unchanged for next automator action
+        stdin_message_copy="$stdin_message"
+        if [ -n "$preFilter" ]; then
+        # Filter out any text appearing before preFilter
+            stdin_message_copy="$(echo "$stdin_message_copy" | sed "/$preFilter/,\$!d")"
+        fi
+        if [ -n "$postFilter" ]; then
+        # Filter out any text appearing after (and including) postFilter
+            stdin_message_copy="$(echo "$stdin_message_copy" | sed "/$postFilter/,\$d")"
+        fi
+        if [ -n "$message" ]; then
+        # Merge automator argument message with workflow (stdin) message
+            message_out="$message
+$stdin_message_copy"
+        fi
+    else
+    # Message only automator argument from input field
         message_out="$message"
     fi
 
@@ -75,11 +101,14 @@ else
     done
     unset IFS
 
-    # Echo stdin message to stdout for next automator action
+    # Echo workflow (stdin) message to stdout for next automator action
     echo -n "${stdin_message}"
     logToFile "Exiting"
     # Exiting with success
     exit 0
 fi
+
+# Echo workflow (stdin) message to stdout for next automator action
+echo -n "${stdin_message}"
 # Exiting with error
 exit 1
